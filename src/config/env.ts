@@ -1,7 +1,8 @@
 // Environment variables configuration
 export const env = {
-  // API URLs
-  API_URL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+  // API URLs - Automatically use correct URL for Vercel deployment
+  API_URL: import.meta.env.VITE_API_URL || 
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'),
   
   // Social Media Credentials
   TWITTER: {

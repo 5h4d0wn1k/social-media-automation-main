@@ -10,14 +10,24 @@ const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 // Rate limiting middleware
 function rateLimit(req: NextApiRequest, res: NextApiResponse, next: () => void) {
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  // Parse IP address properly - handle array case
+  let ipAddress: string = 'unknown';
+  const forwardedFor = req.headers['x-forwarded-for'];
+  
+  if (forwardedFor) {
+    // Convert to string if it's an array
+    ipAddress = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+  } else if (req.socket.remoteAddress) {
+    ipAddress = req.socket.remoteAddress;
+  }
+  
   const now = Date.now();
 
   // Get or create rate limit entry
-  let rateLimitEntry = rateLimitStore.get(ip);
+  let rateLimitEntry = rateLimitStore.get(ipAddress);
   if (!rateLimitEntry) {
     rateLimitEntry = { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
-    rateLimitStore.set(ip, rateLimitEntry);
+    rateLimitStore.set(ipAddress, rateLimitEntry);
   }
 
   // Reset if window has passed

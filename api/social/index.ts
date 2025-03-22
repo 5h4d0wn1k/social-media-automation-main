@@ -1,75 +1,48 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withMiddleware } from '../middleware';
+import platformHandlers from './platforms';
 
-// Import platform handlers
-import { handleTwitterPost, handleTwitterAnalytics } from './platforms/twitter';
-import { handleLinkedInPost, handleLinkedInAnalytics } from './platforms/linkedin';
-import { handleFacebookPost, handleFacebookAnalytics } from './platforms/facebook';
-import { handleInstagramPost, handleInstagramAnalytics } from './platforms/instagram';
-import { handleYouTubePost, handleYouTubeAnalytics } from './platforms/youtube';
-import { handleTelegramPost, handleTelegramAnalytics } from './platforms/telegram';
-import { handleWhatsAppPost, handleWhatsAppAnalytics } from './platforms/whatsapp';
-import { handleGitHubPost, handleGitHubAnalytics } from './platforms/github';
-
-// Platform-specific handlers
-const platformHandlers = {
-  twitter: {
-    post: handleTwitterPost,
-    analytics: handleTwitterAnalytics,
-  },
-  linkedin: {
-    post: handleLinkedInPost,
-    analytics: handleLinkedInAnalytics,
-  },
-  facebook: {
-    post: handleFacebookPost,
-    analytics: handleFacebookAnalytics,
-  },
-  instagram: {
-    post: handleInstagramPost,
-    analytics: handleInstagramAnalytics,
-  },
-  youtube: {
-    post: handleYouTubePost,
-    analytics: handleYouTubeAnalytics,
-  },
-  telegram: {
-    post: handleTelegramPost,
-    analytics: handleTelegramAnalytics,
-  },
-  whatsapp: {
-    post: handleWhatsAppPost,
-    analytics: handleWhatsAppAnalytics,
-  },
-  github: {
-    post: handleGitHubPost,
-    analytics: handleGitHubAnalytics,
-  },
-};
-
-// Main handler
+/**
+ * Main API handler for all social media interactions
+ * This consolidated handler reduces the number of serverless functions needed
+ * for Vercel deployment on the Hobby plan.
+ */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Check for valid HTTP method
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const { platform, action, data } = req.body;
-    
-    if (!platform || !platformHandlers[platform]) {
-      return res.status(400).json({ error: 'Invalid platform' });
+
+    // Check for required fields
+    if (!platform || !action || !data) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!action || !platformHandlers[platform][action]) {
-      return res.status(400).json({ error: 'Invalid action' });
+    // Check if platform is supported
+    if (!platformHandlers[platform]) {
+      return res.status(400).json({ 
+        error: `Unsupported platform: ${platform}`,
+        supportedPlatforms: Object.keys(platformHandlers)
+      });
     }
 
-    return platformHandlers[platform][action](req, res, data);
+    // Log request in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Processing ${platform} request for action: ${action}`);
+    }
+
+    // Handle the platform-specific request
+    return platformHandlers[platform](req, res);
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Social API Error:', error);
+    return res.status(500).json({ 
+      error: 'An unexpected error occurred',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
 
-// Export the handler with middleware
 export default withMiddleware(handler); 

@@ -117,16 +117,26 @@ async function makeApiRequest<T>(action: string, data: any): Promise<T> {
 
   // In production, make real API calls
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add API key header if available - this is needed for the middleware authentication
+    if (import.meta.env.VITE_API_KEY) {
+      headers['x-api-key'] = import.meta.env.VITE_API_KEY;
+    }
+    
     const response = await fetch(`${env.API_URL}/api/social`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ action, ...data }),
+      headers,
+      body: JSON.stringify({ action, platform: data.platform, ...data }),
     });
   
     if (!response.ok) {
-      throw new Error(`API request failed with status: ${response.status}`);
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        errorData?.error || `API request failed with status: ${response.status}`
+      );
     }
   
     return response.json();
