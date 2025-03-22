@@ -1,10 +1,6 @@
-import OpenAI from 'openai';
 import { Platform } from './store';
-
-const openai = new OpenAI({
-  apiKey: 'your-api-key', // Replace with environment variable
-  dangerouslyAllowBrowser: true,
-});
+import { callDeepSeekAPI, deepseekClient } from './api/deepseek';
+import { env } from '../config/env';
 
 interface GenerateContentParams {
   topic: string;
@@ -38,14 +34,11 @@ export async function generateContent({
     Format it properly for the platform.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 250,
-      temperature: 0.7,
-    });
-
-    return response.choices[0]?.message?.content || '';
+    const systemPrompt = 'You are a professional social media content creator who specializes in creating engaging content for different platforms.';
+    
+    // Use callDeepSeekAPI function from deepseek.ts
+    const content = await callDeepSeekAPI(prompt, systemPrompt, 0.7, 250);
+    return content;
   } catch (error) {
     console.error('Error generating content:', error);
     throw new Error('Failed to generate content');
@@ -56,14 +49,11 @@ export async function generateImagePrompt(topic: string): Promise<string> {
   const prompt = `Create a detailed image prompt for ${topic} that would work well for social media.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 100,
-      temperature: 0.7,
-    });
-
-    return response.choices[0]?.message?.content || '';
+    const systemPrompt = 'You are a visual content specialist who creates engaging image descriptions.';
+    
+    // Use callDeepSeekAPI function from deepseek.ts
+    const content = await callDeepSeekAPI(prompt, systemPrompt, 0.7, 100);
+    return content;
   } catch (error) {
     console.error('Error generating image prompt:', error);
     throw new Error('Failed to generate image prompt');

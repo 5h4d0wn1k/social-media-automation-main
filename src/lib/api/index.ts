@@ -60,6 +60,20 @@ const MOCK_ANALYTICS: Record<Platform, PostAnalytics> = {
     shares: 12,
     views: 1500,
     engagement: 10.7
+  },
+  youtube: {
+    likes: 85,
+    comments: 120,
+    shares: 45,
+    views: 2500,
+    engagement: 10.0
+  },
+  github: {
+    likes: 52,
+    comments: 23,
+    shares: 18,
+    views: 450,
+    engagement: 20.7
   }
 };
 
@@ -67,12 +81,28 @@ const MOCK_ANALYTICS: Record<Platform, PostAnalytics> = {
 async function makeApiRequest<T>(action: string, data: any): Promise<T> {
   // In development mode, use mock data
   if (env.IS_DEVELOPMENT) {
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // If it's a post action and we're in development mode but want to simulate API calls
+    if (action === 'post') {
+      try {
+        console.log(`DEV MODE: Would make API call to ${env.API_URL}/api/social for ${data.platform} post`);
+        console.log(`Since we're in development mode, using mock data instead. No real posts are being made.`);
+        
+        // For post actions, generate a mock post ID
+        const mockResponse = { postId: `mock-${Date.now()}-${data.platform}` };
+        return mockResponse as any;
+      } catch (generalError) {
+        console.error('General API error in development mode:', generalError);
+        // Still return mock data even if there's an error
+        const mockResponse = { postId: `mock-error-${Date.now()}-${data.platform}` };
+        return mockResponse as any;
+      }
+    }
 
     // Return mock data based on action
-    if (action === 'post') {
-      return { postId: `mock-${Date.now()}` } as any;
-    } else if (action === 'analytics') {
+    if (action === 'analytics') {
       // Ensure we return a valid analytics object
       const platform = data.platform as Platform;
       if (!platform || !MOCK_ANALYTICS[platform]) {
@@ -80,6 +110,9 @@ async function makeApiRequest<T>(action: string, data: any): Promise<T> {
       }
       return { ...MOCK_ANALYTICS[platform] } as any;
     }
+    
+    // Default mock response for other actions in development
+    return { success: true, mockData: true } as any;
   }
 
   // In production, make real API calls
@@ -93,27 +126,58 @@ async function makeApiRequest<T>(action: string, data: any): Promise<T> {
     });
   
     if (!response.ok) {
-      throw new Error('API request failed');
+      throw new Error(`API request failed with status: ${response.status}`);
     }
   
     return response.json();
   } catch (error) {
     console.error('API request error:', error);
+    
+    // In development mode, provide fallback mock data for any error
+    if (env.IS_DEVELOPMENT) {
+      console.warn(`API error occurred, using mock response as fallback`);
+      if (action === 'post') {
+        return { postId: `mock-error-${Date.now()}-${data.platform}` } as any;
+      }
+      return { success: false, mockData: true, error: error instanceof Error ? error.message : 'Unknown error' } as any;
+    }
+    
     throw error;
   }
 }
 
 export async function postToSocialMedia(platform: Platform, content: string, imageUrl?: string): Promise<string> {
   try {
+    console.log(`Attempting to post to ${platform}:`, { content: content.substring(0, 50) + '...', hasImage: !!imageUrl });
+    
     const { postId } = await makeApiRequest<{ postId: string }>('post', {
       platform,
       content,
       imageUrl,
     });
+    
+    // Check if it's a mock ID (for development fallbacks)
+    const isMockId = postId.startsWith('mock-');
+    if (isMockId) {
+      console.warn(`⚠️ Using mock ID for ${platform} (${postId}). No actual post was made on the platform.`);
+      console.warn(`This is normal in development mode or when the API server is not running.`);
+    } else {
+      console.log(`✅ Successfully posted to ${platform} with ID: ${postId}`);
+    }
+    
     return postId;
   } catch (error) {
-    console.error(`Error posting to ${platform}:`, error);
-    return `mock-${Date.now()}`; // Fallback for development
+    console.error(`❌ Error posting to ${platform}:`, error);
+    
+    // In development, return a mock ID but make it clear this is a fallback
+    if (env.IS_DEVELOPMENT) {
+      const mockId = `mock-error-${Date.now()}-${platform}`;
+      console.warn(`⚠️ Using error fallback mock ID: ${mockId} for ${platform} due to error.`);
+      console.warn(`This is normal in development mode or when the API server is not running.`);
+      return mockId;
+    }
+    
+    throw error;
   }
 }
 

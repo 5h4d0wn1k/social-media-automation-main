@@ -81,3 +81,18 @@ export function calculateEngagement(likes: number, comments: number, shares: num
   if (views === 0) return 0;
   return parseFloat(((likes + comments + shares) / views * 100).toFixed(2));
 }
+
+/**
+ * Copies text to clipboard
+ * @param text - The text to copy
+ * @returns Promise that resolves when copying is complete
+ */
+export async function copy(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return Promise.resolve();
+  } catch (error) {
+    console.error('Failed to copy text to clipboard:', error);
+    return Promise.reject(error);
+  }
+}

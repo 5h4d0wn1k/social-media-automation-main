@@ -15,6 +15,7 @@ export interface Post {
   sourceUrl?: string;
   imageUrl?: string;
   aiGenerated?: boolean;
+  campaignId?: string;
 }
 
 export interface PlatformData {
@@ -25,11 +26,12 @@ export interface PlatformData {
 
 export interface RssFeed {
   id: string;
-  name: string;
   url: string;
+  name: string;
   category: string;
-  refreshInterval: number;
+  frequency: 'hourly' | 'daily' | 'weekly';
   lastFetched?: string;
+  platforms: Platform[];
 }
 
 export interface HashtagGroup {
@@ -40,33 +42,87 @@ export interface HashtagGroup {
   category: string;
 }
 
+export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archived';
+export type CampaignType = 'product-launch' | 'event-promotion' | 'content-series' | 'seasonal' | 'awareness' | 'general';
+
+export interface CampaignPost {
+  id: string;
+  content: string;
+  platforms: Platform[];
+  scheduledTime: string;
+  status: PostStatus;
+  mediaUrls?: string[];
+  position: number;
+  hashtags?: string[];
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description: string;
+  type: CampaignType;
+  status: CampaignStatus;
+  startDate: string;
+  endDate: string;
+  platforms: Platform[];
+  targetAudience?: string;
+  goals?: string[];
+  hashtagGroups?: string[];
+  posts: any[]; // Will be updated with CampaignPost type
+  phases?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+  }>;
+  targetMetrics?: {
+    engagement: number;
+    reach: number;
+    clicks: number;
+  };
+  currentMetrics?: {
+    engagement: number;
+    reach: number;
+    clicks: number;
+  };
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface SocialStore {
   posts: Post[];
   platforms: Record<Platform, PlatformData>;
   rssFeeds: RssFeed[];
   lastScheduledDate: string | null;
   hashtagGroups: HashtagGroup[];
+  campaigns: Campaign[];
   
-  // Post management
   addPost: (post: Omit<Post, 'id'>) => void;
   removePost: (id: string) => void;
   updatePostStatus: (id: string, status: PostStatus) => void;
   
-  // Platform management
   togglePlatform: (platform: Platform, enabled: boolean) => void;
   setPlatformBestTimes: (platform: Platform, times: string[]) => void;
   
-  // RSS Feed management
   addRssFeed: (feed: Omit<RssFeed, 'id'>) => void;
   removeRssFeed: (id: string) => void;
   
-  // Hashtag management
   addHashtagGroup: (group: Omit<HashtagGroup, 'id'>) => void;
   updateHashtagGroup: (id: string, group: Partial<Omit<HashtagGroup, 'id'>>) => void;
   removeHashtagGroup: (id: string) => void;
   
-  // Scheduler management
+  addCampaign: (campaign: Omit<Campaign, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateCampaign: (id: string, campaign: Partial<Omit<Campaign, 'id' | 'createdAt' | 'updatedAt'>>) => void;
+  removeCampaign: (id: string) => void;
+  addCampaignPost: (campaignId: string, post: Omit<CampaignPost, 'id'>) => void;
+  updateCampaignPost: (campaignId: string, postId: string, updates: Partial<Omit<CampaignPost, 'id'>>) => void;
+  removeCampaignPost: (campaignId: string, postId: string) => void;
+  updateCampaignStatus: (id: string, status: CampaignStatus) => void;
+  
   setLastScheduledDate: (date: string) => void;
+  setSocialData: (data: Record<Platform, PlatformData>) => void;
 }
 
 export const useSocialStore = create<SocialStore>()(
@@ -132,6 +188,7 @@ export const useSocialStore = create<SocialStore>()(
           category: 'Personal'
         }
       ],
+      campaigns: [],
       
       addPost: (post) => set((state) => ({
         posts: [...state.posts, { ...post, id: Date.now().toString() }],
@@ -192,6 +249,85 @@ export const useSocialStore = create<SocialStore>()(
       removeHashtagGroup: (id) => set((state) => ({
         hashtagGroups: state.hashtagGroups.filter((group) => group.id !== id),
       })),
+      
+      addCampaign: (campaign) => set((state) => ({
+        campaigns: [...state.campaigns, { 
+          ...campaign, 
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }],
+      })),
+      
+      updateCampaign: (id, updates) => set((state) => ({
+        campaigns: state.campaigns.map((campaign) => 
+          campaign.id === id 
+            ? { 
+                ...campaign, 
+                ...updates, 
+                updatedAt: new Date().toISOString() 
+              } 
+            : campaign
+        ),
+      })),
+      
+      removeCampaign: (id) => set((state) => ({
+        campaigns: state.campaigns.filter((campaign) => campaign.id !== id),
+      })),
+      
+      addCampaignPost: (campaignId, post) => set((state) => ({
+        campaigns: state.campaigns.map((campaign) => 
+          campaign.id === campaignId 
+            ? { 
+                ...campaign, 
+                posts: [...campaign.posts, { ...post, id: Date.now().toString() }],
+                updatedAt: new Date().toISOString()
+              } 
+            : campaign
+        ),
+      })),
+      
+      updateCampaignPost: (campaignId, postId, updates) => set((state) => ({
+        campaigns: state.campaigns.map((campaign) => 
+          campaign.id === campaignId 
+            ? { 
+                ...campaign, 
+                posts: campaign.posts.map((post) => 
+                  post.id === postId ? { ...post, ...updates } : post
+                ),
+                updatedAt: new Date().toISOString()
+              } 
+            : campaign
+        ),
+      })),
+      
+      removeCampaignPost: (campaignId, postId) => set((state) => ({
+        campaigns: state.campaigns.map((campaign) => 
+          campaign.id === campaignId 
+            ? { 
+                ...campaign, 
+                posts: campaign.posts.filter((post) => post.id !== postId),
+                updatedAt: new Date().toISOString()
+              } 
+            : campaign
+        ),
+      })),
+      
+      updateCampaignStatus: (id, status) => set((state) => ({
+        campaigns: state.campaigns.map((campaign) => 
+          campaign.id === id 
+            ? { 
+                ...campaign, 
+                status,
+                updatedAt: new Date().toISOString()
+              } 
+            : campaign
+        ),
+      })),
+      
+      setSocialData: (data) => set({
+        platforms: data,
+      }),
     }),
     {
       name: 'social-store',

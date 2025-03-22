@@ -43,7 +43,29 @@ const hashtagSchema = z.object({
 
 type HashtagFormData = z.infer<typeof hashtagSchema>;
 
-export function HashtagManager() {
+interface HashtagManagerProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function HashtagManager({ open: externalOpen, onOpenChange }: HashtagManagerProps = {}) {
+  const [open, setOpen] = useState(false);
+  
+  // Sync with external state if provided
+  useEffect(() => {
+    if (externalOpen !== undefined) {
+      setOpen(externalOpen);
+    }
+  }, [externalOpen]);
+
+  // Update external state if handler provided
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (onOpenChange) {
+      onOpenChange(newOpen);
+    }
+  };
+
   const hashtagGroups = useSocialStore((state) => state.hashtagGroups);
   const addHashtagGroup = useSocialStore((state) => state.addHashtagGroup);
   const updateHashtagGroup = useSocialStore((state) => state.updateHashtagGroup);
