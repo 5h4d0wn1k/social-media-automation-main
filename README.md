@@ -76,4 +76,5 @@ Fork, create a feature branch, and open a pull request.
 
 ## License
 
-License not yet specified — contact the maintainer before reusing the codebase.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
